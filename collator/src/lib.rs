@@ -461,6 +461,52 @@ fn compute_targets(para_id: ParaId, session_keys: &[ValidatorId], roster: DutyRo
 /// build by the given `BuildParachainContext` and arguments to the underlying polkadot node.
 ///
 /// This function blocks until done.
+pub async fn start_collator<P>(
+	build_parachain_context: P,
+	para_id: ParaId,
+	key: Arc<CollatorPair>,
+	config: Configuration,
+) -> Result<(), polkadot_service::Error> where
+	P: BuildParachainContext,
+	P::ParachainContext: Send + 'static,
+	<P::ParachainContext as ParachainContext>::ProduceCandidate: Send,
+{
+	match (config.expect_chain_spec().is_kusama(), config.roles) {
+		(true, Roles::LIGHT) =>
+			build_collator_service(
+				service::kusama_new_light(config, Some((key.public(), para_id)))?,
+				para_id,
+				key,
+				build_parachain_context,
+			)?.await,
+		(true, _) =>
+			build_collator_service(
+				service::kusama_new_full(config, Some((key.public(), para_id)), None, false, 6000)?,
+				para_id,
+				key,
+				build_parachain_context,
+			)?.await,
+		(false, Roles::LIGHT) =>
+			build_collator_service(
+				service::polkadot_new_light(config, Some((key.public(), para_id)))?,
+				para_id,
+				key,
+				build_parachain_context,
+			)?.await,
+		(false, _) =>
+			build_collator_service(
+				service::polkadot_new_full(config, Some((key.public(), para_id)), None, false, 6000)?,
+				para_id,
+				key,
+				build_parachain_context,
+			)?.await,
+	}
+}
+
+/// Run a collator node with the given `RelayChainContext` and `ParachainContext`
+/// build by the given `BuildParachainContext` and arguments to the underlying polkadot node.
+///
+/// This function blocks until done.
 pub fn run_collator<P>(
 	build_parachain_context: P,
 	para_id: ParaId,
